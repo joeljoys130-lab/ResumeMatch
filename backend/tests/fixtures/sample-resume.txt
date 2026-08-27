@@ -1,0 +1,12 @@
+Alex Johnson
+Senior Software Engineer
+Email: alex@example.com
+
+Summary:
+Experienced Full Stack Engineer with 5 years building scalable web applications using React, Node.js, Express, PostgreSQL, and Docker.
+
+Skills:
+- Frontend: React, Redux, JavaScript, HTML5, CSS3
+- Backend: Node.js, Express, REST APIs, Python
+- Databases: PostgreSQL, MongoDB, Redis
+- Tools: Docker, Git, Jest, Linux

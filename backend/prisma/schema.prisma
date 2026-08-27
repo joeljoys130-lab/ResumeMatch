@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum AppStatus {
+  SAVED
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  REJECTED
+}
+
+enum InterviewStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  name         String    @db.VarChar(255)
+  email        String    @unique @db.VarChar(255)
+  passwordHash String?   @map("password_hash") @db.VarChar(255)
+  role         Role      @default(USER)
+  googleId     String?   @unique @map("google_id") @db.VarChar(255)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  jobDescriptions JobDescription[]
+  applications    Application[]
+  interviews      InterviewSession[]
+
+  @@map("users")
+}
+
+model JobDescription {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @map("user_id")
+  title     String    @db.VarChar(255)
+  company   String?   @db.VarChar(255)
+  content   String    @db.Text
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  applications Application[]
+
+  @@index([userId])
+  @@map("job_descriptions")
+}
+
+model Application {
+  id               Int        @id @default(autoincrement())
+  userId           Int        @map("user_id")
+  jobDescriptionId Int?       @map("job_description_id")
+  company          String     @db.VarChar(255)
+  jobTitle         String     @map("job_title") @db.VarChar(255)
+  jobUrl           String?    @map("job_url") @db.VarChar(512)
+  notes            String?    @db.Text
+  currentStatus    AppStatus  @default(SAVED) @map("current_status")
+  appliedAt        DateTime?  @map("applied_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+  updatedAt        DateTime   @updatedAt @map("updated_at")
+
+  user           User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jobDescription JobDescription?            @relation(fields: [jobDescriptionId], references: [id], onDelete: SetNull)
+  statusHistory  ApplicationStatusHistory[]
+
+  @@index([userId])
+  @@index([currentStatus])
+  @@index([jobDescriptionId])
+  @@map("applications")
+}
+
+model ApplicationStatusHistory {
+  id            Int       @id @default(autoincrement())
+  applicationId Int       @map("application_id")
+  status        AppStatus
+  notes         String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@map("application_status_history")
+}
+
+model InterviewSession {
+  id              Int             @id @default(autoincrement())
+  userId          Int             @map("user_id")
+  role            String          @db.VarChar(255)
+  experienceLevel String          @map("experience_level") @db.VarChar(100)
+  technology      String          @db.VarChar(255)
+  interviewType   String          @map("interview_type") @db.VarChar(100)
+  status          InterviewStatus @default(ACTIVE)
+  overallScore    Int?            @map("overall_score")
+  finalReport     String?         @map("final_report") @db.Text
+  startedAt       DateTime        @default(now()) @map("started_at")
+  completedAt     DateTime?       @map("completed_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questions InterviewQuestion[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("interview_sessions")
+}
+
+model InterviewQuestion {
+  id                 Int       @id @default(autoincrement())
+  interviewSessionId Int       @map("interview_session_id")
+  questionNumber     Int       @map("question_number")
+  question           String    @db.Text
+  userAnswer         String?   @map("user_answer") @db.Text
+  score              Int?
+  technicalAccuracy  Int?      @map("technical_accuracy")
+  communication      Int?
+  feedback           String?   @db.Text
+  weakTopics         Json?     @map("weak_topics")
+  followUpQuestion   String?   @map("follow_up_question") @db.Text
+  createdAt          DateTime  @default(now()) @map("created_at")
+  answeredAt         DateTime? @map("answered_at")
+
+  interviewSession InterviewSession @relation(fields: [interviewSessionId], references: [id], onDelete: Cascade)
+
+  @@index([interviewSessionId])
+  @@map("interview_questions")
+}

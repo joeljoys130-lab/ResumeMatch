@@ -28,11 +28,15 @@ const resumeAnalysisSchema = new mongoose.Schema(
       atsScore: { type: Number, required: true, min: 0, max: 100 },
       experienceMatch: { type: String, default: '' },
       matchedSkills: [{ type: String }],
+      mentionedSkills: [{ type: String }],
+      transferableSkills: [{ type: String }],
       missingSkills: [{ type: String }],
+      requirementMatches: [{ type: mongoose.Schema.Types.Mixed }],
       strengths: [{ type: String }],
       weaknesses: [{ type: String }],
       recommendations: [{ type: String }],
-      summary: { type: String, default: '' }
+      summary: { type: String, default: '' },
+      scoringBreakdown: { type: mongoose.Schema.Types.Mixed }
     },
     inputTokens: { type: Number, default: 0 },
     outputTokens: { type: Number, default: 0 },

@@ -68,14 +68,38 @@ export const ragQuerySchema = z.object({
   conversationId: z.string().optional()
 });
 
+export const requirementMatchItemSchema = z.object({
+  requirement: z.string(),
+  category: z.string().optional().default('General'),
+  importance: z.enum(['critical', 'important', 'optional']).optional().default('important'),
+  status: z.enum(['demonstrated', 'mentioned', 'related', 'missing', 'unsupported']).optional().default('missing'),
+  evidenceLevel: z.number().min(0).max(4).optional().default(0),
+  evidence: z.string().optional().default('No evidence found in resume.'),
+  evidenceLocation: z.string().optional().default('None'),
+  confidence: z.enum(['High', 'Medium', 'Low']).optional().default('High'),
+  reasoning: z.string().optional().default('')
+});
+
 export const resumeAnalysisOutputSchema = z.object({
   matchScore: z.number().min(0).max(100),
   atsScore: z.number().min(0).max(100),
   experienceMatch: z.string(),
   matchedSkills: z.array(z.string()),
   missingSkills: z.array(z.string()),
+  mentionedSkills: z.array(z.string()).optional().default([]),
+  transferableSkills: z.array(z.string()).optional().default([]),
+  requirementMatches: z.array(requirementMatchItemSchema).optional().default([]),
   strengths: z.array(z.string()),
   weaknesses: z.array(z.string()),
   recommendations: z.array(z.string()),
-  summary: z.string()
+  summary: z.string(),
+  scoringBreakdown: z.object({
+    demonstratedCount: z.number().optional().default(0),
+    mentionedCount: z.number().optional().default(0),
+    relatedCount: z.number().optional().default(0),
+    missingCount: z.number().optional().default(0),
+    keywordStuffingCapApplied: z.boolean().optional().default(false),
+    baseEvidenceScore: z.number().optional().default(0),
+    atsReadabilityScore: z.number().optional().default(0)
+  }).optional()
 });

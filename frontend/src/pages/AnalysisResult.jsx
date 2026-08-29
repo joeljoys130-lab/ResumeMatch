@@ -116,28 +116,47 @@ export default function AnalysisResult() {
 
       {/* Matched vs Missing Skills Grid */}
       <div className="grid-2">
-        {/* Matched Skills */}
+        {/* Demonstrated Skills */}
         <div className="card">
-          <h3 style={{ marginBottom: '1rem', color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span>✓</span> Matched Skills ({result.matchedSkills?.length || 0})
+          <h3 style={{ marginBottom: '0.5rem', color: '#34d399', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>✓</span> Explicitly Demonstrated Skills ({result.matchedSkills?.length || 0})
           </h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+            Backed by professional work experience or projects.
+          </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
             {result.matchedSkills?.length > 0 ? (
               result.matchedSkills.map((skill, idx) => (
                 <SkillBadge key={idx} skill={skill} type="matched" />
               ))
             ) : (
-              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No direct technical skill matches identified.</span>
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No demonstrated work experience skills identified.</span>
             )}
           </div>
+
+          {result.transferableSkills?.length > 0 && (
+            <>
+              <h4 style={{ marginTop: '1.25rem', marginBottom: '0.5rem', color: '#60a5fa', fontSize: '0.9rem' }}>
+                🔄 Transferable / Related Technologies ({result.transferableSkills.length})
+              </h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {result.transferableSkills.map((skill, idx) => (
+                  <SkillBadge key={idx} skill={skill} type="transferable" />
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
-        {/* Missing Skills */}
+        {/* Mentioned & Missing Skills */}
         <div className="card">
-          <h3 style={{ marginBottom: '1rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <span>✕</span> Missing / Gap Skills ({result.missingSkills?.length || 0})
+          <h3 style={{ marginBottom: '0.5rem', color: '#f87171', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span>✕</span> Missing Requirement Gaps ({result.missingSkills?.length || 0})
           </h3>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+            Requirements absent from candidate resume.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
             {result.missingSkills?.length > 0 ? (
               result.missingSkills.map((skill, idx) => (
                 <SkillBadge key={idx} skill={skill} type="missing" />
@@ -146,6 +165,22 @@ export default function AnalysisResult() {
               <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>No missing skill gaps detected! Excellent fit.</span>
             )}
           </div>
+
+          {result.mentionedSkills?.length > 0 && (
+            <>
+              <h4 style={{ marginTop: '1rem', marginBottom: '0.25rem', color: '#fbbf24', fontSize: '0.9rem' }}>
+                💬 Mentioned-Only Skills ({result.mentionedSkills.length})
+              </h4>
+              <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                Appears in Skills list without professional work experience evidence.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                {result.mentionedSkills.map((skill, idx) => (
+                  <SkillBadge key={idx} skill={skill} type="mentioned" />
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

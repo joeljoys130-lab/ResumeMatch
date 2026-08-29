@@ -21,14 +21,25 @@ Formulate one clear, realistic, relevant interview question. Return ONLY the que
 }
 
 export function formatAnswerEvalPrompt(session, questionHistory, currentQuestion, userAnswer) {
+  const previousQuestionsText = (questionHistory || [])
+    .map((q, idx) => `Q${idx + 1}: ${q.question}`)
+    .join('\n');
+
   return `
 Target Role: ${session.role} (${session.experienceLevel}) - ${session.technology} (${session.interviewType})
 
-Question Asked:
+Previous Questions Asked in this Session:
+${previousQuestionsText || 'None'}
+
+Current Question Asked:
 ${currentQuestion.question}
 
 Candidate's Answer:
 ${userAnswer}
+
+CRITICAL INSTRUCTION FOR FOLLOW-UP QUESTION:
+Generate a genuinely new, adaptive follow-up question based on the candidate's answer and weak topics.
+DO NOT repeat or rephrase any of the previous questions asked above.
 
 Evaluate the candidate's answer and return ONLY a valid JSON object with the following schema:
 {
@@ -42,26 +53,40 @@ Evaluate the candidate's answer and return ONLY a valid JSON object with the fol
 `;
 }
 
-export function formatFinalReportPrompt(session, questions) {
+export function formatFinalReportPrompt(session, questions, calculatedScores = {}) {
+  const { overallScore = 75, techScore = 75, commScore = 75 } = calculatedScores;
+
   const qAndAs = questions.map((q, idx) => `
 Q${idx + 1}: ${q.question}
 A${idx + 1}: ${q.userAnswer || 'No answer'}
-Score: ${q.score}/10 | Feedback: ${q.feedback || 'N/A'}
+Score: ${q.score}/10 | Technical Accuracy: ${q.technicalAccuracy}/10 | Communication: ${q.communication}/10
+Feedback: ${q.feedback || 'N/A'}
+Weak Topics: ${Array.isArray(q.weakTopics) ? q.weakTopics.join(', ') : 'None'}
 `).join('\n');
 
   return `
 Target Role: ${session.role} (${session.experienceLevel}) - ${session.technology} (${session.interviewType})
 
+Calculated Quantitative Metrics:
+- Overall Performance Score: ${overallScore}/100
+- Technical Mastery Score: ${techScore}/100
+- Communication Score: ${commScore}/100
+
 Complete Interview Q&A Transcript:
 ${qAndAs}
 
-Synthesize a comprehensive final interview performance report.
-Provide:
-1. Overall Performance Summary & Score (0-100)
-2. Technical Mastery Breakdown
-3. Communication & Clarity Assessment
+Synthesize a comprehensive final interview performance report based ONLY on the transcript and calculated metrics above.
+
+REQUIREMENT:
+Your report MUST explicitly state: "**Overall Score:** ${overallScore}/100". Do NOT invent or alter the score.
+
+Include:
+1. Overall Performance Summary & Score (${overallScore}/100)
+2. Technical Mastery Breakdown (${techScore}/100)
+3. Communication & Clarity Assessment (${commScore}/100)
 4. Top Strengths Demonstrated
 5. Key Areas for Improvement & Recommended Study Topics
-6. Hiring Recommendation (Strong Hire, Hire, Weak Pass, Reject)
+6. Hiring Recommendation (Strong Hire if >= 85, Hire if >= 75, Weak Pass if >= 60, Reject if < 60)
 `;
 }
+

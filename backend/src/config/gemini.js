@@ -6,7 +6,7 @@ export function getGeminiClient() {
   if (geminiClient) return geminiClient;
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey.includes('dummy') || apiKey.trim() === '') {
+  if (!apiKey || apiKey.includes('dummy') || apiKey.startsWith('AQ.Ab8') || apiKey.trim() === '') {
     return null;
   }
 

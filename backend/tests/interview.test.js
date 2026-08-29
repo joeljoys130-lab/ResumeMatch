@@ -151,4 +151,72 @@ describe('AI Interview Feature Integration Tests', () => {
       expect(finalReport).toContain(`Overall Score:** ${expectedOverallScore}/100`);
     });
   });
+
+  describe('Answer Quality & Scoring Calibration (No Hardcoded 4/10 Floor)', () => {
+    test('Meaningless gibberish answer should receive low score (<= 1/10) with explicit feedback', async () => {
+      const startRes = await request(app)
+        .post('/api/interviews')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          role: 'Full Stack Developer',
+          experienceLevel: 'Senior',
+          technology: 'React & Node.js',
+          interviewType: 'Technical'
+        });
+
+      const sessId = startRes.body.data.session.id;
+
+      const evalRes = await request(app)
+        .post(`/api/interviews/${sessId}/answer`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ answer: 'asdfghjkl qwertyuiop' });
+
+      expect(evalRes.statusCode).toBe(200);
+      const updatedQ = evalRes.body.data.updatedQuestion;
+      expect(updatedQ.userAnswer).toBe('asdfghjkl qwertyuiop');
+      expect(updatedQ.score).toBeLessThanOrEqual(1);
+      expect(updatedQ.technicalAccuracy).toBe(0);
+      expect(updatedQ.feedback.toLowerCase()).toContain('random key patterns');
+    });
+
+    test('Score ordering must strictly follow answer quality: Gibberish < Superficial < Detailed', async () => {
+      const answers = [
+        'qwrtyopojhvc cfghuiopoijh', // Gibberish (Test 1)
+        'React is used for the frontend and Node.js can be used to create APIs.', // Incomplete (Test 2)
+        'React uses a component-based architecture where state and props determine the UI. I would minimize unnecessary renders using component composition, memoization where appropriate, stable references, lazy loading and code splitting. Node.js provides the backend API using its event-driven non-blocking I/O model.' // Detailed (Test 3)
+      ];
+
+      const scores = [];
+
+      for (let i = 0; i < answers.length; i++) {
+        const startRes = await request(app)
+          .post('/api/interviews')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            role: 'Senior Engineer',
+            experienceLevel: 'Senior',
+            technology: 'React & Node.js',
+            interviewType: 'Technical'
+          });
+
+        const sessId = startRes.body.data.session.id;
+        const evalRes = await request(app)
+          .post(`/api/interviews/${sessId}/answer`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({ answer: answers[i] });
+
+        scores.push(evalRes.body.data.updatedQuestion.score);
+      }
+
+      // Assert strict score calibration ordering
+      expect(scores[0]).toBeLessThanOrEqual(1); // Test 1 Gibberish <= 1/10
+      expect(scores[1]).toBeGreaterThanOrEqual(3); // Test 2 Basic >= 3/10
+      expect(scores[1]).toBeLessThanOrEqual(5); // Test 2 Basic <= 5/10
+      expect(scores[2]).toBeGreaterThanOrEqual(8); // Test 3 Detailed >= 8/10
+
+      expect(scores[0]).toBeLessThan(scores[1]);
+      expect(scores[1]).toBeLessThan(scores[2]);
+    });
+  });
 });
+

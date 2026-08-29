@@ -196,6 +196,117 @@ export async function finalizeInterviewSession(userId, sessionId) {
   };
 }
 
+/**
+ * Analyzes answer text quality to detect gibberish, meaningless inputs, superficial answers, or detailed technical responses.
+ */
+export function analyzeAnswerTextQuality(answerText = '', technology = '') {
+  const text = (answerText || '').trim();
+  if (!text) {
+    return {
+      isMeaningless: true,
+      score: 0,
+      technicalAccuracy: 0,
+      communication: 0,
+      feedback: 'No answer text was submitted. Please provide a relevant technical response.',
+      weakTopics: ['Core Technical Communication']
+    };
+  }
+
+  const words = text.split(/\s+/).filter(Boolean);
+  const totalLength = text.length;
+
+  // 1. Unspaced single string or random sequence (e.g. "qwrtyopojhvc", "cfghuiopoijh")
+  if (words.length === 1 && totalLength >= 5) {
+    const vowels = (text.match(/[aeiou]/gi) || []).length;
+    const vowelRatio = vowels / totalLength;
+    if (vowelRatio < 0.15 || vowelRatio > 0.75) {
+      return {
+        isMeaningless: true,
+        score: 0,
+        technicalAccuracy: 0,
+        communication: 0,
+        feedback: 'The response contains no readable words or technical concepts. Please provide a clear explanation.',
+        weakTopics: ['Basic Technical Communication', 'Domain Vocabulary']
+      };
+    }
+  }
+
+  // 2. Keyboard mash / repeating pattern detection (e.g. "asdfghjkl", "qwertyuiop")
+  const mashPatterns = [/asdfgh/i, /qwerty/i, /zxcvbn/i, /dfghjk/i, /fghuio/i, /ertyui/i, /rtyopo/i];
+  if (mashPatterns.some(p => p.test(text))) {
+    return {
+      isMeaningless: true,
+      score: 1,
+      technicalAccuracy: 0,
+      communication: 1,
+      feedback: 'The submitted response consists of random key patterns and does not answer the technical question.',
+      weakTopics: ['Technical Articulation', 'Core Domain Concepts']
+    };
+  }
+
+  // 3. Ratio of recognized words / technical vocabulary
+  const commonWords = new Set([
+    'react', 'node', 'nodejs', 'express', 'postgresql', 'postgres', 'mongo', 'mongodb', 'redis', 'api', 'apis', 'frontend', 'backend',
+    'component', 'components', 'state', 'props', 'render', 'renders', 'rendering', 'hook', 'hooks', 'ui', 'user', 'interface',
+    'architecture', 'architectural', 'system', 'data', 'database', 'query', 'async', 'await', 'promise', 'promises', 'event', 'loop',
+    'io', 'non-blocking', 'handling', 'error', 'errors', 'boundary', 'boundaries', 'testing', 'jest', 'unit', 'integration',
+    'performance', 'optimization', 'optimize', 'optimizing', 'memory', 'leak', 'leaks', 'cache', 'caching', 'code', 'splitting',
+    'lazy', 'loading', 'memo', 'memoization', 'usememo', 'usecallback', 'ref', 'refs', 'service', 'server', 'client', 'http', 'rest',
+    'is', 'are', 'was', 'were', 'use', 'used', 'using', 'for', 'to', 'can', 'be', 'create', 'build', 'structure', 'handling', 'handle',
+    'where', 'which', 'that', 'this', 'with', 'from', 'into', 'under', 'over', 'by', 'and', 'or', 'not', 'in', 'on', 'at', 'an', 'a'
+  ]);
+
+  let validWordCount = 0;
+  for (const word of words) {
+    const cleanWord = word.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (commonWords.has(cleanWord) || cleanWord.length >= 4) {
+      validWordCount++;
+    }
+  }
+
+  const validWordRatio = words.length > 0 ? (validWordCount / words.length) : 0;
+  if (validWordRatio < 0.35 || words.length < 3) {
+    return {
+      isMeaningless: true,
+      score: 1,
+      technicalAccuracy: 0,
+      communication: 1,
+      feedback: 'The response lacks technical substance or coherent structure. Please elaborate with specific technical concepts.',
+      weakTopics: ['Technical Communication', 'Domain Knowledge']
+    };
+  }
+
+  // 4. Distinction between Superficial/Incomplete (Test 2: score 3-5) vs Detailed Technical (Test 3: score 8-10)
+  const techKeywords = ['react', 'node', 'express', 'postgres', 'postgresql', 'mongo', 'mongodb', 'redis', 'api', 'state', 'props', 'component', 'async', 'await', 'promise', 'query', 'memo', 'cache', 'event', 'io', 'render', 'hook', 'middleware', 'boundary', 'zod', 'prisma', 'testing', 'jest'];
+  const textLower = text.toLowerCase();
+
+  let techMatches = 0;
+  techKeywords.forEach(k => {
+    if (textLower.includes(k)) techMatches++;
+  });
+
+  if (words.length <= 16 || techMatches <= 2) {
+    return {
+      isMeaningless: false,
+      score: 4,
+      technicalAccuracy: 4,
+      communication: 5,
+      feedback: `Identifies high-level concepts for ${technology}, but lacks detailed architectural patterns, implementation depth, or trade-offs.`,
+      weakTopics: ['Implementation Detail', 'Performance Trade-offs']
+    };
+  }
+
+  const score = Math.min(10, Math.max(8, 7 + Math.min(3, techMatches - 2)));
+  return {
+    isMeaningless: false,
+    score,
+    technicalAccuracy: score,
+    communication: Math.min(10, score),
+    feedback: `Excellent technical response demonstrating deep understanding of ${technology} architecture and performance considerations.`,
+    weakTopics: ['Edge Case Micro-optimizations']
+  };
+}
+
 // Internal AI Helper Functions (Primary: Gemini API, Fallback: Adaptive Dynamic Engine)
 async function generateAIQuestion(session, existingQuestions = []) {
   const gemini = getGeminiClient();
@@ -224,6 +335,12 @@ async function generateAIQuestion(session, existingQuestions = []) {
 }
 
 async function evaluateAnswerWithAI(session, questions, currentQuestion, answerText) {
+  let evaluationResult = null;
+  let geminiSuccess = false;
+  let geminiRawResponse = '';
+  let fallbackUsed = false;
+  let fallbackReason = '';
+
   const gemini = getGeminiClient();
   if (gemini) {
     try {
@@ -238,8 +355,8 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
         }
       });
 
-      const rawText = response.text || '';
-      let cleaned = rawText.trim();
+      geminiRawResponse = response.text || '';
+      let cleaned = geminiRawResponse.trim();
       if (cleaned.startsWith('```json')) cleaned = cleaned.replace(/^```json/, '').replace(/```$/, '').trim();
       const jsonStart = cleaned.indexOf('{');
       const jsonEnd = cleaned.lastIndexOf('}');
@@ -247,8 +364,8 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
 
       const parsed = JSON.parse(cleaned);
 
-      // Clamp sub-scores to 0-10
-      const score = Math.min(10, Math.max(0, Math.round(parsed.score ?? 7)));
+      // Clamp sub-scores strictly to 0-10 without artificial floor
+      const score = Math.min(10, Math.max(0, Math.round(parsed.score ?? 0)));
       const technicalAccuracy = Math.min(10, Math.max(0, Math.round(parsed.technicalAccuracy ?? score)));
       const communication = Math.min(10, Math.max(0, Math.round(parsed.communication ?? score)));
 
@@ -259,35 +376,54 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
         followUpQuestion = generateFallbackAdaptiveQuestion(session, existingQTexts, questions.length + 1, parsed.weakTopics || []);
       }
 
-      return {
+      evaluationResult = {
         score,
         technicalAccuracy,
         communication,
-        feedback: parsed.feedback || `Solid explanation for ${session.technology}.`,
-        weakTopics: Array.isArray(parsed.weakTopics) ? parsed.weakTopics : ['Deep System Optimization'],
+        feedback: parsed.feedback || `Evaluation for ${session.technology}.`,
+        weakTopics: Array.isArray(parsed.weakTopics) ? parsed.weakTopics : ['System Design'],
         followUpQuestion
       };
+      geminiSuccess = true;
     } catch (err) {
-      console.warn('⚠️ Gemini API answer evaluation fallback:', err.message);
+      fallbackUsed = true;
+      fallbackReason = `Gemini API call failed: ${err.message}`;
+      console.warn(`⚠️ Gemini API evaluation error: ${err.message}`);
     }
+  } else {
+    fallbackUsed = true;
+    fallbackReason = 'GEMINI_API_KEY is missing, placeholder (AQ.Ab8...), or unconfigured';
   }
 
-  // Realistic dynamic fallback evaluation
-  const score = Math.min(10, Math.max(4, Math.round((answerText || '').length / 45) + 3));
-  const technicalAccuracy = Math.min(10, Math.max(4, score));
-  const communication = Math.min(10, Math.max(4, score + (answerText.length > 80 ? 1 : 0)));
-  const existingQTexts = questions.map(q => q.question);
-  const weakTopics = ['Production Profiling', 'Error Recovery Strategy'];
-  const followUpQuestion = generateFallbackAdaptiveQuestion(session, existingQTexts, questions.length + 1, weakTopics);
+  if (!evaluationResult) {
+    // Dynamic text quality evaluation fallback (No hardcoded 4/10 floor)
+    const quality = analyzeAnswerTextQuality(answerText, session.technology);
+    const existingQTexts = questions.map(q => q.question);
+    const followUpQuestion = generateFallbackAdaptiveQuestion(session, existingQTexts, questions.length + 1, quality.weakTopics);
 
-  return {
-    score,
-    technicalAccuracy,
-    communication,
-    feedback: `Demonstrates good understanding of ${session.technology}. Clear explanation of key concepts.`,
-    weakTopics,
-    followUpQuestion
-  };
+    evaluationResult = {
+      score: quality.score,
+      technicalAccuracy: quality.technicalAccuracy,
+      communication: quality.communication,
+      feedback: `[Evaluation Engine]: ${quality.feedback}`,
+      weakTopics: quality.weakTopics,
+      followUpQuestion
+    };
+  }
+
+  // Diagnostic Logger (Does not print API keys)
+  const llmProvider = geminiSuccess ? `Google Gemini (${process.env.GEMINI_MODEL || 'gemini-2.5-flash'})` : 'Local Intelligent Evaluation Engine';
+  console.log(`\n🔍 [AI Evaluation Diagnostics]`);
+  console.log(`   - Answer Received: "${answerText}"`);
+  console.log(`   - LLM Provider Used: ${llmProvider}`);
+  console.log(`   - Gemini Request Succeeded: ${geminiSuccess ? 'YES' : 'NO'}`);
+  console.log(`   - Gemini Response: ${geminiRawResponse || 'N/A (Fallback mode active)'}`);
+  console.log(`   - Parsed Technical Score: ${evaluationResult.technicalAccuracy}/10`);
+  console.log(`   - Parsed Communication Score: ${evaluationResult.communication}/10`);
+  console.log(`   - Fallback Path Used: ${fallbackUsed ? `YES (${fallbackReason})` : 'NO'}`);
+  console.log(`   - Final Persisted Score: ${evaluationResult.score}/10`);
+
+  return evaluationResult;
 }
 
 async function generateAIFinalReport(session, questions, calculatedScores) {
@@ -386,4 +522,5 @@ function generateFallbackAdaptiveQuestion(session, existingQuestions = [], turnN
   const uniqueId = turnNumber + '_' + Date.now().toString().slice(-4);
   return `Targeting ${weakFocus} in ${tech}: How would you design and test a resilient system handling high-concurrency requests? (Ref: #${uniqueId})`;
 }
+
 

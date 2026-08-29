@@ -37,7 +37,15 @@ ${currentQuestion.question}
 Candidate's Answer:
 ${userAnswer}
 
-CRITICAL INSTRUCTION FOR FOLLOW-UP QUESTION:
+CRITICAL INSTRUCTION FOR SCORING & FOLLOW-UP:
+1. Meaningless or Gibberish Answer (e.g. "asdfghjkl", random character strings, no coherent English/technical substance):
+   - Set score: 0-1, technicalAccuracy: 0, communication: 0-1.
+   - Feedback MUST explain that the response contains no readable technical content.
+2. Incomplete or Superficial Answer (e.g. "React is for frontend"):
+   - Set score: 3-5, technicalAccuracy: 3-5, communication: 4-5.
+3. Comprehensive & Detailed Technical Answer:
+   - Set score: 8-10, technicalAccuracy: 8-10, communication: 8-10.
+
 Generate a genuinely new, adaptive follow-up question based on the candidate's answer and weak topics.
 DO NOT repeat or rephrase any of the previous questions asked above.
 

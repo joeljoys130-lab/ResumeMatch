@@ -24,10 +24,10 @@
 ### Jest Integration & Unit Test Suite (`npm test`)
 
 ```text
-Test Suites: 2 passed, 2 total
-Tests:       9 passed, 9 total
+Test Suites: 3 passed, 3 total
+Tests:       17 passed, 17 total
 Snapshots:   0 total
-Time:        4.018 s
+Time:        5.691 s
 ```
 
 - `POST /api/auth/signup` (valid signup): **PASSED**
@@ -39,6 +39,21 @@ Time:        4.018 s
 - `Sanitizer - Prompt injection detection & stripping`: **PASSED**
 - `Sanitizer - Professional text preservation`: **PASSED**
 - `RBAC Authorization - Standard USER role forbidden on Admin endpoint`: **PASSED**
+- `isDuplicateQuestion Helper - Identical question detection`: **PASSED**
+- `isDuplicateQuestion Helper - Similar question detection`: **PASSED**
+- `isDuplicateQuestion Helper - Distinct question allowance`: **PASSED**
+- `AI Interview - ACTIVE session initialization & first question`: **PASSED**
+- `AI Interview - 4-turn state progression & 0-10 sub-scores`: **PASSED**
+- `AI Interview - Overall score normalization & report matching`: **PASSED**
+- `AI Interview Calibration - Meaningless gibberish answer (<= 1/10)`: **PASSED**
+- `AI Interview Calibration - Answer quality relative ordering (Gibberish < Superficial < Detailed)`: **PASSED**
+
+### Controlled AI Interview Scoring Calibration (`node scratch/test_scoring_calibration.js`)
+
+- **Gibberish Input** (`"asdfghjkl qwertyuiop"`): Score **1/10** (Technical: 0/10, Comm: 1/10) - Recognized as invalid key patterns.
+- **Incomplete Basic Answer** (`"React is used for frontend..."`): Score **4/10** (Technical: 4/10, Comm: 5/10) - Recognized as basic high-level statement lacking depth.
+- **Detailed Technical Answer** (Full architectural answer): Score **10/10** (Technical: 10/10, Comm: 10/10) - Recognized as comprehensive technical explanation.
+- **Relative Score Calibration**: $\text{Score}_{\text{gibberish}} (1/10) < \text{Score}_{\text{basic}} (4/10) < \text{Score}_{\text{detailed}} (10/10)$ **PASSED**
 
 ### LLM Evaluation Suite (`npm run evaluate`)
 
@@ -70,11 +85,11 @@ Schema Compliance: 100% Zod validation compliance
 
 ## 5. AI Capabilities Verification
 
-- **Claude LLM Match Engine**: `@anthropic-ai/sdk` wrapper with system prompt, XML delimiters (`<resume>`, `<job_description>`), server-side Zod output validation, 1-step retry logic, and token/cost audit logging (`LLMResponse`).
+- **Google Gemini & Fallback LLM Match Engine**: Primary Google Gemini API integration (`getGeminiClient()`) with intelligent fallback engine when API key is missing or unconfigured.
 - **Prompt Injection Defense**: Multi-layer sanitizer (`sanitizer.js`) successfully flagged and stripped injection patterns (`ignore previous instructions`, `system:`) with 100% eval test pass rate.
 - **Real Embedding RAG Assistant**: Knowledge base chunking & vectorization (`embeddingService.js`), cosine similarity search over markdown knowledge files (`resume-writing.md`, `ats-guidelines.md`, `interview-prep.md`, `career-advice.md`), grounded answers with source citations. Out-of-bounds queries correctly refuse knowledge fabrication.
 - **Controlled Function Calling**: Tools (`getUserApplications`, `calculateSkillGap`, `saveInterviewResult`) executed with user ownership verification before database execution.
-- **Adaptive AI Interview Agent**: Stateful session management in PostgreSQL, progressive Q&A evaluation, follow-up generation, and final report synthesis.
+- **Adaptive AI Interview Agent**: Stateful session management in PostgreSQL, progressive Q&A evaluation, text quality analysis (rejecting gibberish with 0-1/10 score), duplicate question prevention, and mathematical score normalization ($S_{overall} = \text{Math.round}(\text{avgScore} \times 10)$).
 - **SSE Response Streaming**: Server-Sent Events endpoint (`/api/knowledge/stream`) emitting real-time progressive token streams.
 - **Cron Jobs**: `node-cron` background tasks (`cronJobs.js`) scanning stale applications and generating weekly career summaries.
 
@@ -99,7 +114,7 @@ All routes built, styled, and verified:
 
 | Concept | Status | File | Evidence |
 |---|---|---|---|
-| **LLM Integration** | IMPLEMENTED + VERIFIED | `src/services/llmService.js` | `@anthropic-ai/sdk` API client & token monitoring |
+| **LLM Integration** | IMPLEMENTED + VERIFIED | `src/services/llmService.js` | Google Gemini API / Fallback integration & token monitoring |
 | **Prompt Engineering** | IMPLEMENTED + VERIFIED | `src/prompts/analysisPrompt.js` | XML delimiters `<resume>`, `<job_description>` |
 | **Structured Outputs** | IMPLEMENTED + VERIFIED | `src/utils/validators.js` | Server-side Zod validation & 1-step retry logic |
 | **PostgreSQL & Prisma** | IMPLEMENTED + VERIFIED | `prisma/schema.prisma` | Real PostgreSQL 18.4 DB with Prisma v5.22.0 ORM |
@@ -114,15 +129,16 @@ All routes built, styled, and verified:
 | **File Parsing** | IMPLEMENTED + VERIFIED | `src/services/parserService.js` | PDF (`pdf-parse`) & DOCX (`mammoth`) with cleanup |
 | **Real Embedding RAG** | IMPLEMENTED + VERIFIED | `src/services/ragService.js` | Knowledge document vectorization & grounded citations |
 | **Controlled Tools** | IMPLEMENTED + VERIFIED | `src/services/toolService.js` | Controlled function calling with user ownership validation |
-| **Multi-Step Agent** | IMPLEMENTED + VERIFIED | `src/services/interviewService.js` | Stateful mock interview agent with progressive Q&A |
+| **Multi-Step Agent** | IMPLEMENTED + VERIFIED | `src/services/interviewService.js` | Stateful mock interview agent with progressive Q&A & score calibration |
 | **SSE Streaming** | IMPLEMENTED + VERIFIED | `src/controllers/knowledgeController.js` | Server-Sent Events token stream |
 | **Scheduled Cron Jobs**| IMPLEMENTED + VERIFIED | `src/jobs/cronJobs.js` | `node-cron` background tasks |
 | **LLM Evaluation** | IMPLEMENTED + VERIFIED | `evaluation/runEvaluation.js` | 25 test cases runner saving to MongoDB |
-| **Automated Tests** | IMPLEMENTED + VERIFIED | `tests/auth.test.js`, `security.test.js` | Jest & Supertest API integration suite (9/9 passed) |
+| **Automated Tests** | IMPLEMENTED + VERIFIED | `tests/auth.test.js`, `security.test.js`, `interview.test.js` | Jest & Supertest API integration suite (17/17 passed) |
 | **Docker Container** | IMPLEMENTED + VERIFIED | `docker-compose.yml`, `Dockerfiles` | Containerized setup for 5 services |
 
 ---
 
 ## 8. Final Status
 
-**READY FOR VIVA**
+**READY FOR VIVA & SUBMISSION**
+

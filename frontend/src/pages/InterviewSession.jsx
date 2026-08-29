@@ -91,11 +91,11 @@ export default function InterviewSession() {
       <div className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-            Session #{session.id} • {session.interviewType} Interview
+            Session #{session.id} • {session.interviewType} Interview • Question {currentUnansweredQuestion ? currentUnansweredQuestion.questionNumber : session.questions.length} of {session.questionCount || 5}
           </div>
           <h2>{session.role} ({session.experienceLevel})</h2>
           <div style={{ fontSize: '0.85rem', color: 'var(--accent-teal)' }}>
-            Tech Focus: {session.technology}
+            Tech Focus: {session.technology} • Total Questions: {session.questionCount || 5}
           </div>
         </div>
 

@@ -32,11 +32,26 @@ export const startInterviewSchema = z.object({
   role: z.string().trim().min(2, 'Role is required'),
   experienceLevel: z.enum(['Junior', 'Mid-Level', 'Senior', 'Lead/Principal']),
   technology: z.string().trim().min(1, 'Technology focus is required'),
-  interviewType: z.enum(['Technical', 'Behavioral', 'System Design', 'General HR'])
+  interviewType: z.enum(['Technical', 'Behavioral', 'System Design', 'General HR']),
+  questionCount: z.number().int().refine(val => [5, 10, 15].includes(val), {
+    message: 'Question count must be 5, 10, or 15'
+  }).optional().default(5)
 });
 
 export const submitInterviewAnswerSchema = z.object({
-  answer: z.string().trim().min(5, 'Answer must be at least 5 characters')
+  answer: z.string().trim().min(1, 'Answer cannot be empty')
+});
+
+export const interviewAnswerEvaluationOutputSchema = z.object({
+  score: z.number().min(0).max(10),
+  technicalAccuracy: z.number().min(0).max(10),
+  communication: z.number().min(0).max(10),
+  relevance: z.number().min(0).max(10).optional().default(5),
+  feedback: z.string(),
+  weakTopics: z.array(z.string()).optional(),
+  missingConcepts: z.array(z.string()).optional(),
+  strengths: z.array(z.string()).optional(),
+  followUpQuestion: z.string().optional()
 });
 
 export const ragQuerySchema = z.object({

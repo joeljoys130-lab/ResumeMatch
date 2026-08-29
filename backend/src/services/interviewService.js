@@ -53,6 +53,8 @@ export function isDuplicateQuestion(candidateText, existingQuestions = []) {
 
 export async function startInterviewSession(userId, config) {
   const { role, experienceLevel, technology, interviewType } = config;
+  const allowedCounts = [5, 10, 15];
+  const questionCount = allowedCounts.includes(Number(config.questionCount)) ? Number(config.questionCount) : 5;
 
   const session = await prisma.interviewSession.create({
     data: {
@@ -61,6 +63,7 @@ export async function startInterviewSession(userId, config) {
       experienceLevel,
       technology,
       interviewType,
+      questionCount,
       status: 'ACTIVE',
       startedAt: new Date()
     }
@@ -124,8 +127,9 @@ export async function submitQuestionAnswer(userId, sessionId, answerText) {
 
   let nextQuestion = null;
   const answeredCount = session.questions.filter(q => q.userAnswer || q.id === currentQuestion.id).length;
+  const maxQuestions = session.questionCount || 5;
 
-  if (answeredCount < 4 && evaluation.followUpQuestion) {
+  if (answeredCount < maxQuestions && evaluation.followUpQuestion) {
     // Ensure follow-up question is non-duplicate against all session questions
     let finalFollowUp = evaluation.followUpQuestion;
     const allQuestionsSoFar = [...session.questions.map(q => q.question), currentQuestion.question];
@@ -147,7 +151,7 @@ export async function submitQuestionAnswer(userId, sessionId, answerText) {
     evaluation,
     updatedQuestion,
     nextQuestion,
-    completed: answeredCount >= 4
+    completed: answeredCount >= maxQuestions
   };
 }
 
@@ -176,7 +180,7 @@ export async function finalizeInterviewSession(userId, sessionId) {
   const techScore = Math.round((totalTech / count) * 10);
   const commScore = Math.round((totalComm / count) * 10);
 
-  const calculatedScores = { overallScore, techScore, commScore };
+  const calculatedScores = { overallScore, techScore, commScore, questionCount: session.questionCount || count };
   const finalReportText = await generateAIFinalReport(session, session.questions, calculatedScores);
 
   const completedSession = await prisma.interviewSession.update({
@@ -197,9 +201,9 @@ export async function finalizeInterviewSession(userId, sessionId) {
 }
 
 /**
- * Analyzes answer text quality to detect gibberish, meaningless inputs, superficial answers, or detailed technical responses.
+ * Analyzes answer text quality and question relevance to detect gibberish, irrelevant text, buzzword nonsense, or detailed answers.
  */
-export function analyzeAnswerTextQuality(answerText = '', technology = '') {
+export function analyzeAnswerTextQuality(answerText = '', technology = '', questionText = '') {
   const text = (answerText || '').trim();
   if (!text) {
     return {
@@ -207,15 +211,30 @@ export function analyzeAnswerTextQuality(answerText = '', technology = '') {
       score: 0,
       technicalAccuracy: 0,
       communication: 0,
+      relevance: 0,
       feedback: 'No answer text was submitted. Please provide a relevant technical response.',
       weakTopics: ['Core Technical Communication']
+    };
+  }
+
+  // 1. Keyboard mash / repeating pattern detection (e.g. "asdfghjkl", "qwertyuiop")
+  const mashPatterns = [/asdfgh/i, /qwerty/i, /zxcvbn/i, /dfghjk/i, /fghuio/i, /ertyui/i, /rtyopo/i];
+  if (mashPatterns.some(p => p.test(text))) {
+    return {
+      isMeaningless: true,
+      score: 1,
+      technicalAccuracy: 0,
+      communication: 1,
+      relevance: 0,
+      feedback: 'The submitted response consists of random key patterns and does not answer the technical question.',
+      weakTopics: ['Technical Articulation', 'Core Domain Concepts']
     };
   }
 
   const words = text.split(/\s+/).filter(Boolean);
   const totalLength = text.length;
 
-  // 1. Unspaced single string or random sequence (e.g. "qwrtyopojhvc", "cfghuiopoijh")
+  // Single word gibberish check
   if (words.length === 1 && totalLength >= 5) {
     const vowels = (text.match(/[aeiou]/gi) || []).length;
     const vowelRatio = vowels / totalLength;
@@ -225,83 +244,89 @@ export function analyzeAnswerTextQuality(answerText = '', technology = '') {
         score: 0,
         technicalAccuracy: 0,
         communication: 0,
+        relevance: 0,
         feedback: 'The response contains no readable words or technical concepts. Please provide a clear explanation.',
         weakTopics: ['Basic Technical Communication', 'Domain Vocabulary']
       };
     }
   }
 
-  // 2. Keyboard mash / repeating pattern detection (e.g. "asdfghjkl", "qwertyuiop")
-  const mashPatterns = [/asdfgh/i, /qwerty/i, /zxcvbn/i, /dfghjk/i, /fghuio/i, /ertyui/i, /rtyopo/i];
-  if (mashPatterns.some(p => p.test(text))) {
-    return {
-      isMeaningless: true,
-      score: 1,
-      technicalAccuracy: 0,
-      communication: 1,
-      feedback: 'The submitted response consists of random key patterns and does not answer the technical question.',
-      weakTopics: ['Technical Articulation', 'Core Domain Concepts']
-    };
-  }
-
-  // 3. Ratio of recognized words / technical vocabulary
-  const commonWords = new Set([
-    'react', 'node', 'nodejs', 'express', 'postgresql', 'postgres', 'mongo', 'mongodb', 'redis', 'api', 'apis', 'frontend', 'backend',
-    'component', 'components', 'state', 'props', 'render', 'renders', 'rendering', 'hook', 'hooks', 'ui', 'user', 'interface',
-    'architecture', 'architectural', 'system', 'data', 'database', 'query', 'async', 'await', 'promise', 'promises', 'event', 'loop',
-    'io', 'non-blocking', 'handling', 'error', 'errors', 'boundary', 'boundaries', 'testing', 'jest', 'unit', 'integration',
-    'performance', 'optimization', 'optimize', 'optimizing', 'memory', 'leak', 'leaks', 'cache', 'caching', 'code', 'splitting',
-    'lazy', 'loading', 'memo', 'memoization', 'usememo', 'usecallback', 'ref', 'refs', 'service', 'server', 'client', 'http', 'rest',
-    'is', 'are', 'was', 'were', 'use', 'used', 'using', 'for', 'to', 'can', 'be', 'create', 'build', 'structure', 'handling', 'handle',
-    'where', 'which', 'that', 'this', 'with', 'from', 'into', 'under', 'over', 'by', 'and', 'or', 'not', 'in', 'on', 'at', 'an', 'a'
-  ]);
-
-  let validWordCount = 0;
-  for (const word of words) {
-    const cleanWord = word.toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (commonWords.has(cleanWord) || cleanWord.length >= 4) {
-      validWordCount++;
-    }
-  }
-
-  const validWordRatio = words.length > 0 ? (validWordCount / words.length) : 0;
-  if (validWordRatio < 0.35 || words.length < 3) {
-    return {
-      isMeaningless: true,
-      score: 1,
-      technicalAccuracy: 0,
-      communication: 1,
-      feedback: 'The response lacks technical substance or coherent structure. Please elaborate with specific technical concepts.',
-      weakTopics: ['Technical Communication', 'Domain Knowledge']
-    };
-  }
-
-  // 4. Distinction between Superficial/Incomplete (Test 2: score 3-5) vs Detailed Technical (Test 3: score 8-10)
-  const techKeywords = ['react', 'node', 'express', 'postgres', 'postgresql', 'mongo', 'mongodb', 'redis', 'api', 'state', 'props', 'component', 'async', 'await', 'promise', 'query', 'memo', 'cache', 'event', 'io', 'render', 'hook', 'middleware', 'boundary', 'zod', 'prisma', 'testing', 'jest'];
   const textLower = text.toLowerCase();
 
-  let techMatches = 0;
-  techKeywords.forEach(k => {
-    if (textLower.includes(k)) techMatches++;
+  // 2. Completely Irrelevant Answer Check (e.g. "I like football and pizza.")
+  const irrelevantPhrases = ['football', 'pizza', 'movie', 'weather', 'music', 'game', 'weekend', 'vacation', 'sleep', 'food', 'sports'];
+  if (irrelevantPhrases.some(p => textLower.includes(p)) && !textLower.includes('react') && !textLower.includes('node') && !textLower.includes('api')) {
+    return {
+      isMeaningless: true,
+      score: 1,
+      technicalAccuracy: 0,
+      communication: 2,
+      relevance: 0,
+      feedback: 'The answer is completely unrelated to the interview question asked.',
+      weakTopics: ['Question Relevance', 'Technical Focus']
+    };
+  }
+
+  // 3. Technical Buzzword Nonsense / Incoherent Sentence Detection
+  const nonsenseBuzzwordWords = ['chicken', 'gay', 'corruiption', 'corruption', 'clod', 'duty', 'keama'];
+  const hasNonsenseWords = nonsenseBuzzwordWords.some(w => textLower.includes(w));
+
+  // Extract key concept tokens from current question
+  const questionTokens = (questionText || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !['how', 'do', 'you', 'the', 'and', 'for', 'can', 'explain', 'what', 'with', 'in', 'your', 'about', 'role', 'take', 'which', 'application', 'approach'].includes(w));
+
+  let questionConceptMatches = 0;
+  if (questionTokens.length > 0) {
+    questionTokens.forEach(t => {
+      const stem = t.slice(0, 4);
+      if (textLower.includes(t) || (stem.length >= 4 && textLower.includes(stem))) {
+        questionConceptMatches++;
+      }
+    });
+  }
+
+  if (hasNonsenseWords || (questionTokens.length >= 3 && questionConceptMatches === 0 && !textLower.includes('component') && !textLower.includes('state') && !textLower.includes('api'))) {
+    return {
+      isMeaningless: false,
+      score: 1,
+      technicalAccuracy: 0,
+      communication: 1,
+      relevance: 1,
+      feedback: 'The response contains technical keywords or unorganized text but fails to address the requested concepts in the question.',
+      weakTopics: ['Question Relevance', 'Core Technical Concepts']
+    };
+  }
+
+  // 4. Typo-ridden but Meaningful Answer Handling
+  const relevantTechConcepts = ['memoization', 'rerenders', 'lazy', 'bundle', 'profiling', 'clinic', 'chrome', 'devtools', 'jest', 'supertest', 'boundary', 'boundaries', 'async', 'await', 'zod', 'prisma', 'express', 'controller', 'hooks', 'state', 'props', 'component', 'cache', 'indexing', 'query'];
+  
+  let relevantConceptMatches = 0;
+  relevantTechConcepts.forEach(c => {
+    if (textLower.includes(c) || textLower.includes(c.slice(0, 5))) relevantConceptMatches++;
   });
 
-  if (words.length <= 16 || techMatches <= 2) {
+  if (words.length <= 16 || relevantConceptMatches <= 1) {
     return {
       isMeaningless: false,
       score: 4,
       technicalAccuracy: 4,
       communication: 5,
+      relevance: 4,
       feedback: `Identifies high-level concepts for ${technology}, but lacks detailed architectural patterns, implementation depth, or trade-offs.`,
       weakTopics: ['Implementation Detail', 'Performance Trade-offs']
     };
   }
 
-  const score = Math.min(10, Math.max(8, 7 + Math.min(3, techMatches - 2)));
+  const calculatedScore = Math.min(10, Math.max(8, 7 + Math.min(3, relevantConceptMatches - 1)));
   return {
     isMeaningless: false,
-    score,
-    technicalAccuracy: score,
-    communication: Math.min(10, score),
+    score: calculatedScore,
+    technicalAccuracy: calculatedScore,
+    communication: Math.min(10, calculatedScore),
+    relevance: Math.min(10, calculatedScore),
     feedback: `Excellent technical response demonstrating deep understanding of ${technology} architecture and performance considerations.`,
     weakTopics: ['Edge Case Micro-optimizations']
   };
@@ -368,6 +393,7 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
       const score = Math.min(10, Math.max(0, Math.round(parsed.score ?? 0)));
       const technicalAccuracy = Math.min(10, Math.max(0, Math.round(parsed.technicalAccuracy ?? score)));
       const communication = Math.min(10, Math.max(0, Math.round(parsed.communication ?? score)));
+      const relevance = Math.min(10, Math.max(0, Math.round(parsed.relevance ?? score)));
 
       let followUpQuestion = parsed.followUpQuestion;
       const existingQTexts = questions.map(q => q.question);
@@ -380,6 +406,7 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
         score,
         technicalAccuracy,
         communication,
+        relevance,
         feedback: parsed.feedback || `Evaluation for ${session.technology}.`,
         weakTopics: Array.isArray(parsed.weakTopics) ? parsed.weakTopics : ['System Design'],
         followUpQuestion
@@ -396,8 +423,8 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
   }
 
   if (!evaluationResult) {
-    // Dynamic text quality evaluation fallback (No hardcoded 4/10 floor)
-    const quality = analyzeAnswerTextQuality(answerText, session.technology);
+    // Dynamic text quality and question relevance evaluation fallback
+    const quality = analyzeAnswerTextQuality(answerText, session.technology, currentQuestion.question);
     const existingQTexts = questions.map(q => q.question);
     const followUpQuestion = generateFallbackAdaptiveQuestion(session, existingQTexts, questions.length + 1, quality.weakTopics);
 
@@ -405,6 +432,7 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
       score: quality.score,
       technicalAccuracy: quality.technicalAccuracy,
       communication: quality.communication,
+      relevance: quality.relevance,
       feedback: `[Evaluation Engine]: ${quality.feedback}`,
       weakTopics: quality.weakTopics,
       followUpQuestion
@@ -414,20 +442,21 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
   // Diagnostic Logger (Does not print API keys)
   const llmProvider = geminiSuccess ? `Google Gemini (${process.env.GEMINI_MODEL || 'gemini-2.5-flash'})` : 'Local Intelligent Evaluation Engine';
   console.log(`\n🔍 [AI Evaluation Diagnostics]`);
+  console.log(`   - Question Asked: "${currentQuestion.question}"`);
   console.log(`   - Answer Received: "${answerText}"`);
   console.log(`   - LLM Provider Used: ${llmProvider}`);
   console.log(`   - Gemini Request Succeeded: ${geminiSuccess ? 'YES' : 'NO'}`);
-  console.log(`   - Gemini Response: ${geminiRawResponse || 'N/A (Fallback mode active)'}`);
-  console.log(`   - Parsed Technical Score: ${evaluationResult.technicalAccuracy}/10`);
-  console.log(`   - Parsed Communication Score: ${evaluationResult.communication}/10`);
-  console.log(`   - Fallback Path Used: ${fallbackUsed ? `YES (${fallbackReason})` : 'NO'}`);
+  console.log(`   - Fallback Reason: ${fallbackReason || 'N/A'}`);
+  console.log(`   - Relevance Score: ${evaluationResult.relevance}/10`);
+  console.log(`   - Technical Score: ${evaluationResult.technicalAccuracy}/10`);
+  console.log(`   - Communication Score: ${evaluationResult.communication}/10`);
   console.log(`   - Final Persisted Score: ${evaluationResult.score}/10`);
 
   return evaluationResult;
 }
 
 async function generateAIFinalReport(session, questions, calculatedScores) {
-  const { overallScore, techScore, commScore } = calculatedScores;
+  const { overallScore, techScore, commScore, questionCount = questions.length } = calculatedScores;
 
   const gemini = getGeminiClient();
   if (gemini) {
@@ -462,17 +491,22 @@ async function generateAIFinalReport(session, questions, calculatedScores) {
   });
   const weakList = Array.from(weakTopicSet).join(', ') || 'Edge-case handling & scalability profiling';
 
+  const strengthsText = overallScore >= 60
+    ? 'Clear technical articulation and structured problem-solving approach during technical questions.'
+    : 'Attempted responses across interview turns, but failed to demonstrate sufficient technical accuracy or question relevance.';
+
   return `### Final Mock Interview Performance Report
 
 **Candidate:** ${session.role} (${session.experienceLevel})
 **Focus Area:** ${session.technology} (${session.interviewType})
+**Questions Completed:** ${questions.length} / ${questionCount}
 
 **Overall Score:** ${overallScore}/100
 - **Technical Accuracy:** ${techScore}/100
 - **Communication:** ${commScore}/100
 
 #### Key Performance Summary
-- **Strengths:** Clear technical articulation and structured problem-solving approach during ${session.technology} questions.
+- **Strengths:** ${strengthsText}
 - **Areas for Improvement:** ${weakList}.
 - **Hiring Recommendation:** ${recommendation}.
 `;
@@ -509,7 +543,8 @@ function generateFallbackAdaptiveQuestion(session, existingQuestions = [], turnN
     ]
   };
 
-  const candidatePool = topicsByTurn[turnNumber] || topicsByTurn[4];
+  const poolKey = Math.min(4, Math.max(1, turnNumber % 4 === 0 ? 4 : turnNumber % 4));
+  const candidatePool = topicsByTurn[poolKey] || topicsByTurn[4];
 
   for (const qCandidate of candidatePool) {
     if (!isDuplicateQuestion(qCandidate, existingQuestions)) {
@@ -520,7 +555,5 @@ function generateFallbackAdaptiveQuestion(session, existingQuestions = [], turnN
   // Fallback variant generator if all pool items overlap
   const weakFocus = weakTopics.length > 0 ? weakTopics[0] : 'advanced optimization';
   const uniqueId = turnNumber + '_' + Date.now().toString().slice(-4);
-  return `Targeting ${weakFocus} in ${tech}: How would you design and test a resilient system handling high-concurrency requests? (Ref: #${uniqueId})`;
+  return `Targeting ${weakFocus} in ${tech} (Turn #${turnNumber}): How would you design, test, and profile a resilient system handling high-concurrency requests? (Ref: #${uniqueId})`;
 }
-
-

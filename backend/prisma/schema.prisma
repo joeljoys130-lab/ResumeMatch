@@ -103,6 +103,7 @@ model InterviewSession {
   experienceLevel String          @map("experience_level") @db.VarChar(100)
   technology      String          @db.VarChar(255)
   interviewType   String          @map("interview_type") @db.VarChar(100)
+  questionCount   Int             @default(5) @map("question_count")
   status          InterviewStatus @default(ACTIVE)
   overallScore    Int?            @map("overall_score")
   finalReport     String?         @map("final_report") @db.Text

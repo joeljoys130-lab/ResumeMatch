@@ -16,6 +16,7 @@ export default function Interviews() {
   const [experienceLevel, setExperienceLevel] = useState('Mid-Level');
   const [technology, setTechnology] = useState('React & Node.js');
   const [interviewType, setInterviewType] = useState('Technical');
+  const [questionCount, setQuestionCount] = useState(5);
 
   const navigate = useNavigate();
 
@@ -46,7 +47,8 @@ export default function Interviews() {
         role,
         experienceLevel,
         technology,
-        interviewType
+        interviewType,
+        questionCount: Number(questionCount)
       });
 
       if (res.data?.success) {
@@ -124,6 +126,19 @@ export default function Interviews() {
                 <option value="Behavioral">Behavioral (STAR Method)</option>
                 <option value="System Design">System Architecture & Design</option>
                 <option value="General HR">General HR & Career Fit</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Number of Questions</label>
+              <select
+                className="form-select"
+                value={questionCount}
+                onChange={(e) => setQuestionCount(Number(e.target.value))}
+              >
+                <option value={5}>5 Questions (Quick Practice)</option>
+                <option value={10}>10 Questions (Standard Interview)</option>
+                <option value={15}>15 Questions (Deep Evaluation)</option>
               </select>
             </div>
 

@@ -37,32 +37,45 @@ ${currentQuestion.question}
 Candidate's Answer:
 ${userAnswer}
 
-CRITICAL INSTRUCTIONS FOR QUESTION-SPECIFIC EVALUATION & SCORING:
-1. Evaluate candidate's answer against the EXACT question asked above.
-2. Determine whether the answer actually addresses the requested concepts, task, and question.
-3. DO NOT award points merely for technical keywords. Mentioning keywords (e.g. "MongoDB", "indexing", "React", "Node.js", "memory") without explaining their relevance to the specific question must NOT result in a passing score.
-4. SCORING RULES:
-   - Score 0-1/10: Gibberish, random key patterns, or meaningless text.
-   - Score 0-2/10: Completely unrelated answer, random technical buzzwords, or nonsense that does not address the question.
-   - Score 3-5/10: Partially relevant, basic understanding, addresses some part of the question with missing depth.
-   - Score 6-7/10: Generally correct, addresses most of the question with reasonable technical understanding.
-   - Score 8-9/10: Strong, technically accurate answer directly addressing requested concepts.
-   - Score 10/10: Exceptional, comprehensive technical answer addressing all important aspects.
-5. Typo Tolerance: Do NOT mark an answer down merely for minor spelling errors if the technical meaning is clear and relevant.
+CRITICAL INSTRUCTIONS FOR QUESTION-INTENT & CONCEPT-EXPLANATION EVALUATION:
+1. QUESTION INTENT & CONCEPT EXPLANATION:
+   - Identify the exact expected answer dimensions from the question (e.g. state management, validation, async side effects).
+   - Evaluate whether the candidate EXPLAINS and DEMONSTRATES these concepts vs MERELY MENTIONING passive nouns (e.g. "React components communicate using props" is a mere mention, NOT an explanation of state transitions).
+   - Mere mentions or passive tech lists receive score 3-5/10. Paragraphs listing technologies (MongoDB, Redis, Docker, Kubernetes, PostgreSQL, JWT) without explaining the question intent MUST receive score <= 2-3/10.
 
-Generate a genuinely new, adaptive follow-up question based on the candidate's answer and weak topics.
-DO NOT repeat or rephrase any of the previous questions asked above.
+2. ANSWER DEPTH CALIBRATION:
+   - Gibberish: 0-1
+   - Unrelated answer: 0-2
+   - Technical buzzword dump / Tech list: 0-2
+   - Relevant shallow (mere mentions): 3-5
+   - Relevant & adequately explained: 6-7
+   - Detailed, correct, question-focused: 8-10
 
-Evaluate the candidate's answer and return ONLY a valid JSON object with the following schema:
+3. CONTRADICTION & ANTI-PATTERNS:
+   - Detect explicit rejection of principles ("don't follow principles", "one giant component", "tightly coupled", "don't worry about security/validation/testing"). Set contradictionDetected: true, cap score <= 2.
+
+4. TYPO TOLERANCE:
+   - Do NOT mark down minor spelling errors if technical meaning is clear (e.g. "unecessary rerenders").
+
+Return ONLY a valid JSON object matching:
 {
-  "score": number (0-10),
+  "detectedQuestionIntent": "summary of question focus",
+  "expectedConcepts": ["array of expected question dimensions"],
+  "explainedConcepts": ["array of concepts actually explained"],
+  "merelyMentionedConcepts": ["array of concepts merely mentioned without explanation"],
+  "missingConcepts": ["array of required concepts missed"],
+  "unrelatedConcepts": ["array of unrelated tech/buzzwords mentioned"],
+  "answerDepth": "Gibberish | Unrelated | Buzzword Dump | Shallow | Adequately Explained | Detailed",
+  "relevance": number (0-10),
   "technicalAccuracy": number (0-10),
   "communication": number (0-10),
-  "relevance": number (0-10),
-  "feedback": "constructive 2-3 sentence feedback explaining relevance and accuracy",
-  "missingConcepts": ["array of concepts requested in the question that were missed"],
+  "score": number (0-10),
+  "feedback": "constructive 2-3 sentence feedback explaining depth and relevance",
   "strengths": ["array of demonstrated strengths"],
   "weakTopics": ["array of specific topics needing improvement"],
+  "contradictionDetected": boolean,
+  "buzzwordDumpDetected": boolean,
+  "metaTestTextDetected": boolean,
   "followUpQuestion": "the next adaptive question to deepen the interview"
 }
 `;

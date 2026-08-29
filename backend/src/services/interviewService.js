@@ -203,8 +203,203 @@ export async function finalizeInterviewSession(userId, sessionId) {
 /**
  * Analyzes answer text quality and question relevance to detect gibberish, irrelevant text, buzzword nonsense, or detailed answers.
  */
+/**
+ * Reusable Question Intent & Dimension Extractor.
+ * Dynamically parses ANY question string to extract topic intent and expected explanation dimensions.
+ */
+export function extractQuestionIntent(questionText = '') {
+  const qLower = (questionText || '').toLowerCase();
+
+  // Rule 1: Database Query Optimization & Indexing
+  if ((qLower.includes('database') || qLower.includes('db')) && (qLower.includes('optimize') || qLower.includes('query') || qLower.includes('index') || qLower.includes('heavy') || qLower.includes('performance') || qLower.includes('sql') || qLower.includes('mongo'))) {
+    return {
+      topicIntent: 'Database Query Optimization & Indexing',
+      expectedConcepts: [
+        'B-Tree / Compound indexing strategy',
+        'N+1 query resolution & eager loading',
+        'Connection pooling & query profiling'
+      ],
+      explanationKeywords: ['indexing', 'index', 'indexes', 'b-tree', 'compound index', 'query optimization', 'explain analyze', 'n+1', 'eager loading', 'connection pool', 'connection pooling', 'prisma', 'mongoose', 'join', 'aggregation'],
+      passiveMentions: ['postgresql', 'mongodb', 'database', 'table', 'records']
+    };
+  }
+
+  // Rule 2: File Upload Processing & Streaming
+  if (qLower.includes('upload') || qLower.includes('s3') || qLower.includes('file upload') || qLower.includes('files')) {
+    return {
+      topicIntent: 'File Upload Processing & Stream Management',
+      expectedConcepts: [
+        'Multipart form parsing (Multer / Busboy)',
+        'Cloud storage integration (S3 / Presigned URLs)',
+        'Stream processing for large files'
+      ],
+      explanationKeywords: ['multer', 'busboy', 'multipart', 's3', 'presigned url', 'presigned urls', 'stream', 'streaming', 'pipe', 'blob', 'cloud storage', 'mime', 'size limit'],
+      passiveMentions: ['file', 'upload', 'buffer', 'disk']
+    };
+  }
+
+  // Rule 3: Error Handling, Retries & Resilience
+  if (qLower.includes('retry') || qLower.includes('retries') || qLower.includes('circuit breaker') || (qLower.includes('error') && !qLower.includes('boundary'))) {
+    return {
+      topicIntent: 'Centralized Error Handling & System Resilience',
+      expectedConcepts: [
+        'Centralized error handling middleware',
+        'Custom error classes & HTTP status code mapping',
+        'Retry mechanisms & circuit breakers'
+      ],
+      explanationKeywords: ['centralized error', 'error middleware', 'custom error', 'http status', 'retry', 'retries', 'exponential backoff', 'circuit breaker', 'fallback', 'try/catch', 'jitter'],
+      passiveMentions: ['node', 'express', 'api', 'request']
+    };
+  }
+
+  // Rule 4: Authentication, Authorization & API Security
+  if (qLower.includes('auth') || qLower.includes('protect') || qLower.includes('malicious') || qLower.includes('security') || qLower.includes('sanitiz')) {
+    return {
+      topicIntent: 'Authentication, Authorization & API Security',
+      expectedConcepts: [
+        'Stateless authentication (JWT / OAuth2 / Cookies)',
+        'Role-based access control & token expiration',
+        'Input sanitization & defense-in-depth (XSS / SQLi / CSRF)'
+      ],
+      explanationKeywords: ['jwt', 'oauth', 'bearer', 'token', 'tokens', 'hash', 'bcrypt', 'argon2', 'cookie', 'cookies', 'session', 'sanitize', 'sanitizer', 'helmet', 'rate limit', 'cors', 'xss', 'sqli', 'csrf', 'rbac', 'middleware'],
+      passiveMentions: ['api', 'node', 'express', 'react', 'user', 'header']
+    };
+  }
+
+  // Rule 5: API Versioning & Routing
+  if (qLower.includes('version')) {
+    return {
+      topicIntent: 'API Design & Endpoint Versioning Strategy',
+      expectedConcepts: [
+        'URI / Header-based API versioning',
+        'Backward compatibility & deprecation strategy',
+        'RESTful routing standards'
+      ],
+      explanationKeywords: ['versioning', 'v1', 'header versioning', 'path versioning', 'backward compatibility', 'deprecation', 'semantic versioning', 'router', 'gateway'],
+      passiveMentions: ['api', 'node', 'express', 'request', 'response']
+    };
+  }
+
+  // Rule 6: Concurrency & High Throughput
+  if (qLower.includes('concurrent') || qLower.includes('throughput') || qLower.includes('concurrency')) {
+    return {
+      topicIntent: 'High-Concurrency Request Handling & System Throughput',
+      expectedConcepts: [
+        'Asynchronous event loop & non-blocking I/O',
+        'Rate limiting & request queuing (Redis / Leaky bucket)',
+        'Horizontal worker scaling & cluster mode'
+      ],
+      explanationKeywords: ['non-blocking', 'event loop', 'rate limit', 'queue', 'bullmq', 'redis', 'cluster', 'worker threads', 'horizontal scaling', 'load balancing'],
+      passiveMentions: ['node', 'server', 'request', 'concurrency']
+    };
+  }
+
+  // Rule 7: Logging, Observability & Telemetry
+  if (qLower.includes('log') || qLower.includes('observability') || qLower.includes('monitoring') || qLower.includes('telemetry')) {
+    return {
+      topicIntent: 'Logging, Distributed Tracing & Observability',
+      expectedConcepts: [
+        'Structured logging (Winston / Pino)',
+        'Correlation IDs & distributed tracing',
+        'APM monitoring & metrics (Prometheus / Grafana)'
+      ],
+      explanationKeywords: ['winston', 'pino', 'structured log', 'structured logging', 'correlation id', 'tracing', 'opentelemetry', 'prometheus', 'grafana', 'apm', 'metrics'],
+      passiveMentions: ['log', 'monitoring', 'server', 'application']
+    };
+  }
+
+  // Rule 8: Reusable UI Components
+  if (qLower.includes('reusable') || qLower.includes('design system')) {
+    return {
+      topicIntent: 'Reusable Component Architecture & UI Design Patterns',
+      expectedConcepts: [
+        'Compound components & render props',
+        'Separation of container vs presentational components',
+        'Prop-types / TypeScript interface design'
+      ],
+      explanationKeywords: ['compound component', 'custom hook', 'custom hooks', 'composition', 'props', 'typescript', 'interface', 'container component', 'design system', 'reusable', 'separate presentation'],
+      passiveMentions: ['react', 'ui', 'view', 'style']
+    };
+  }
+
+  // Rule 9: State Transitions, Data Validation & Asynchronous Operations
+  if (qLower.includes('state') || qLower.includes('validation') || qLower.includes('validate') || qLower.includes('validating') || qLower.includes('side effect') || qLower.includes('transitions')) {
+    return {
+      topicIntent: 'State Transitions, Data Validation & Asynchronous Operations',
+      expectedConcepts: [
+        'React state management (useState / useReducer)',
+        'Predictable state transitions & reducers',
+        'Frontend / Backend data validation (Zod / Joi / Schema)',
+        'Async side-effect handling & loading/error states'
+      ],
+      explanationKeywords: ['usestate', 'usereducer', 'reducer', 'actions', 'zod', 'joi', 'schema validation', 'client validation', 'backend validation', 'side effect', 'loading state', 'error state', 'try/catch', 'validate', 'validates', 'validation'],
+      passiveMentions: ['props', 'api', 'component', 'promises', 'backend', 'frontend', 'async', 'asynchronous']
+    };
+  }
+
+  // Rule 10: Automated Testing, Error Boundaries & Deployments
+  if (qLower.includes('test') || qLower.includes('boundary') || qLower.includes('downtime') || qLower.includes('deployment')) {
+    return {
+      topicIntent: 'Automated Testing, Error Boundaries & Zero-Downtime Deployments',
+      expectedConcepts: [
+        'Automated testing strategy (Jest / Supertest / Vitest)',
+        'React Error Boundaries (ComponentDidCatch / Fallback UI)',
+        'Zero-downtime deployment strategy (Rolling / Blue-Green / Health checks)'
+      ],
+      explanationKeywords: ['jest', 'supertest', 'vitest', 'unit test', 'unit testing', 'integration test', 'integration testing', 'errorboundary', 'error boundary', 'fallback ui', 'componentdidcatch', 'zero downtime', 'rolling', 'blue-green', 'health check', 'ci/cd', 'e2e test'],
+      passiveMentions: ['react', 'node', 'api', 'component', 'state', 'service']
+    };
+  }
+
+  // Rule 11: Profiling, Memory Leaks, Performance Bottlenecks & Rendering
+  if (qLower.includes('profile') || qLower.includes('leak') || qLower.includes('bottleneck') || qLower.includes('memory') || qLower.includes('render')) {
+    return {
+      topicIntent: 'Performance Profiling, Bottleneck Detection & Memory Leak Prevention',
+      expectedConcepts: [
+        'Performance profiling tools (Chrome DevTools / React Profiler / Node Inspector)',
+        'Memory leak detection & event listener/useEffect cleanup',
+        'Render optimization & memoization (useMemo, useCallback, React.memo)'
+      ],
+      explanationKeywords: ['devtools', 'profiler', 'heap snapshot', 'memoization', 'usememo', 'usecallback', 'react.memo', 'cleanup', 'clean up', 'unmount', 'unmounts', 'event listener', 'event listeners', 'subscription', 'subscriptions', 'timer', 'timers', 'unnecessary re-renders', 'avoidable updates', 'bundle size', 'lazy loading', 'query optimization'],
+      passiveMentions: ['react', 'node', 'component', 'api', 'state', 'redis', 'postgresql']
+    };
+  }
+
+  // Rule 12: Scalable Architecture Principles & Modularity
+  if (qLower.includes('architectur') || qLower.includes('scale') || qLower.includes('modular') || qLower.includes('structure')) {
+    return {
+      topicIntent: 'Scalable Architecture Principles & Modularity',
+      expectedConcepts: [
+        'Layered architecture & separation of concerns (Routes, Controllers, Services)',
+        'Component modularity & decoupling presentation from business logic',
+        'Scalability strategy & dependency management'
+      ],
+      explanationKeywords: ['component-based', 'component composition', 'event-driven', 'non-blocking', 'layered architecture', 'separation of concerns', 'decoupled', 'uncoupled', 'dependency management', 'dependency injection', 'domain driven', 'clean controller', 'stateless api', 'horizontal scaling', 'microservices', 'modular', 'separate presentation', 'business logic'],
+      passiveMentions: ['react', 'node', 'component', 'props', 'api', 'docker', 'redis', 'mongodb', 'kubernetes']
+    };
+  }
+
+  // General dynamic fallback for any other unseen question string
+  const tokens = qLower
+    .replace(/[^a-z0-9\s]/g, '')
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !['how', 'do', 'you', 'the', 'and', 'for', 'can', 'explain', 'what', 'with', 'in', 'your', 'about', 'role', 'take', 'which', 'application', 'approach', 'would', 'handle', 'design', 'protect'].includes(w));
+
+  return {
+    topicIntent: `Domain Mastery on ${tokens.slice(0, 3).join(' ')}`,
+    expectedConcepts: tokens.slice(0, 4).map(t => `${t} implementation & design trade-offs`),
+    explanationKeywords: tokens.slice(0, 4),
+    passiveMentions: ['component', 'service', 'api', 'database']
+  };
+}
+
+/**
+ * Analyzes answer text quality and question relevance to detect gibberish, irrelevant text, buzzword nonsense, or detailed answers.
+ */
 export function analyzeAnswerTextQuality(answerText = '', technology = '', questionText = '') {
   const text = (answerText || '').trim();
+  const intent = extractQuestionIntent(questionText);
+
   if (!text) {
     return {
       isMeaningless: true,
@@ -212,13 +407,57 @@ export function analyzeAnswerTextQuality(answerText = '', technology = '', quest
       technicalAccuracy: 0,
       communication: 0,
       relevance: 0,
-      feedback: 'No answer text was submitted. Please provide a relevant technical response.',
-      weakTopics: ['Core Technical Communication']
+      feedback: '[Evaluation Engine]: No answer text was submitted. Please provide a relevant technical response.',
+      weakTopics: ['Core Technical Communication'],
+      detectedQuestionIntent: intent.topicIntent,
+      expectedConcepts: intent.expectedConcepts,
+      explainedConcepts: [],
+      merelyMentionedConcepts: [],
+      missingConcepts: intent.expectedConcepts,
+      unrelatedConcepts: [],
+      answerDepth: 'No Answer',
+      contradictionDetected: false,
+      buzzwordDumpDetected: false,
+      metaTestTextDetected: false
     };
   }
 
-  // 1. Keyboard mash / repeating pattern detection (e.g. "asdfghjkl", "qwertyuiop")
-  const mashPatterns = [/asdfgh/i, /qwerty/i, /zxcvbn/i, /dfghjk/i, /fghuio/i, /ertyui/i, /rtyopo/i];
+  const textLower = text.toLowerCase();
+
+  // 1. Meta / Test Instruction Text Detection
+  const metaPhrases = [
+    'for testing whether your scoring system',
+    'these should be scored low',
+    'use this to test the evaluator',
+    'question:',
+    'answer:',
+    'this is a test'
+  ];
+  const metaTestTextDetected = metaPhrases.some(p => textLower.includes(p));
+  if (metaTestTextDetected) {
+    return {
+      isMeaningless: false,
+      score: 1,
+      technicalAccuracy: 1,
+      communication: 2,
+      relevance: 1,
+      feedback: '[Evaluation Engine]: Detected test/instruction meta-text rather than a candidate interview response.',
+      weakTopics: ['Interview Context & Focus'],
+      detectedQuestionIntent: intent.topicIntent,
+      expectedConcepts: intent.expectedConcepts,
+      explainedConcepts: [],
+      merelyMentionedConcepts: [],
+      missingConcepts: intent.expectedConcepts,
+      unrelatedConcepts: [],
+      answerDepth: 'Meta / Instruction Text',
+      contradictionDetected: false,
+      buzzwordDumpDetected: false,
+      metaTestTextDetected: true
+    };
+  }
+
+  // 2. Gibberish & Keyboard Pattern Detection (e.g., "asdfghjkl", ";kdjfn", "qwrtyopojhvc")
+  const mashPatterns = [/asdfgh/i, /qwerty/i, /zxcvbn/i, /dfghjk/i, /fghuio/i, /ertyui/i, /rtyopo/i, /;kdjfn/i, /wefghj/i];
   if (mashPatterns.some(p => p.test(text))) {
     return {
       isMeaningless: true,
@@ -226,15 +465,24 @@ export function analyzeAnswerTextQuality(answerText = '', technology = '', quest
       technicalAccuracy: 0,
       communication: 1,
       relevance: 0,
-      feedback: 'The submitted response consists of random key patterns and does not answer the technical question.',
-      weakTopics: ['Technical Articulation', 'Core Domain Concepts']
+      feedback: '[Evaluation Engine]: The submitted response consists of random key patterns or keyboard mash and does not answer the technical question.',
+      weakTopics: ['Technical Articulation', 'Core Domain Concepts'],
+      detectedQuestionIntent: intent.topicIntent,
+      expectedConcepts: intent.expectedConcepts,
+      explainedConcepts: [],
+      merelyMentionedConcepts: [],
+      missingConcepts: intent.expectedConcepts,
+      unrelatedConcepts: [],
+      answerDepth: 'Gibberish Key Patterns',
+      contradictionDetected: false,
+      buzzwordDumpDetected: false,
+      metaTestTextDetected: false
     };
   }
 
   const words = text.split(/\s+/).filter(Boolean);
   const totalLength = text.length;
 
-  // Single word gibberish check
   if (words.length === 1 && totalLength >= 5) {
     const vowels = (text.match(/[aeiou]/gi) || []).length;
     const vowelRatio = vowels / totalLength;
@@ -245,90 +493,173 @@ export function analyzeAnswerTextQuality(answerText = '', technology = '', quest
         technicalAccuracy: 0,
         communication: 0,
         relevance: 0,
-        feedback: 'The response contains no readable words or technical concepts. Please provide a clear explanation.',
-        weakTopics: ['Basic Technical Communication', 'Domain Vocabulary']
+        feedback: '[Evaluation Engine]: The response contains no readable words or technical concepts.',
+        weakTopics: ['Basic Technical Communication'],
+        detectedQuestionIntent: intent.topicIntent,
+        expectedConcepts: intent.expectedConcepts,
+        explainedConcepts: [],
+        merelyMentionedConcepts: [],
+        missingConcepts: intent.expectedConcepts,
+        unrelatedConcepts: [],
+        answerDepth: 'Single Word Gibberish',
+        contradictionDetected: false,
+        buzzwordDumpDetected: false,
+        metaTestTextDetected: false
       };
     }
   }
 
-  const textLower = text.toLowerCase();
+  // 3. Contradiction & Anti-Pattern Detection (Excludes positive negations like "don't ignore validation" or "never skip")
+  const positiveNegations = [
+    "don't ignore", "never skip", "don't skip", "never avoid", "never ignore", "should not ignore", "must not skip", "cannot skip"
+  ];
+  const isPositiveNegation = positiveNegations.some(p => textLower.includes(p));
 
-  // 2. Completely Irrelevant Answer Check (e.g. "I like football and pizza.")
-  const irrelevantPhrases = ['football', 'pizza', 'movie', 'weather', 'music', 'game', 'weekend', 'vacation', 'sleep', 'food', 'sports'];
-  if (irrelevantPhrases.some(p => textLower.includes(p)) && !textLower.includes('react') && !textLower.includes('node') && !textLower.includes('api')) {
-    return {
-      isMeaningless: true,
-      score: 1,
-      technicalAccuracy: 0,
-      communication: 2,
-      relevance: 0,
-      feedback: 'The answer is completely unrelated to the interview question asked.',
-      weakTopics: ['Question Relevance', 'Technical Focus']
-    };
-  }
+  const contradictionPhrases = [
+    "don't follow architectural", "don't really follow any architectural", "no architectural principles", "don't care about architectural",
+    "tightly coupled", "single large component", "one giant component", "one large component",
+    "avoid separating services", "avoid separating modules", "don't worry about scalability", "don't worry about security", "don't worry about validation",
+    "don't validate", "no validation", "don't use automated tests", "avoid automated testing", "don't handle errors", "no security at all"
+  ];
 
-  // 3. Technical Buzzword Nonsense / Incoherent Sentence Detection
-  const nonsenseBuzzwordWords = ['chicken', 'gay', 'corruiption', 'corruption', 'clod', 'duty', 'keama'];
-  const hasNonsenseWords = nonsenseBuzzwordWords.some(w => textLower.includes(w));
+  const contradictionDetected = !isPositiveNegation && contradictionPhrases.some(p => textLower.includes(p));
 
-  // Extract key concept tokens from current question
-  const questionTokens = (questionText || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .split(/\s+/)
-    .filter(w => w.length > 3 && !['how', 'do', 'you', 'the', 'and', 'for', 'can', 'explain', 'what', 'with', 'in', 'your', 'about', 'role', 'take', 'which', 'application', 'approach'].includes(w));
-
-  let questionConceptMatches = 0;
-  if (questionTokens.length > 0) {
-    questionTokens.forEach(t => {
-      const stem = t.slice(0, 4);
-      if (textLower.includes(t) || (stem.length >= 4 && textLower.includes(stem))) {
-        questionConceptMatches++;
-      }
-    });
-  }
-
-  if (hasNonsenseWords || (questionTokens.length >= 3 && questionConceptMatches === 0 && !textLower.includes('component') && !textLower.includes('state') && !textLower.includes('api'))) {
+  if (contradictionDetected) {
     return {
       isMeaningless: false,
       score: 1,
-      technicalAccuracy: 0,
-      communication: 1,
+      technicalAccuracy: 1,
+      communication: 2,
       relevance: 1,
-      feedback: 'The response contains technical keywords or unorganized text but fails to address the requested concepts in the question.',
-      weakTopics: ['Question Relevance', 'Core Technical Concepts']
+      feedback: '[Evaluation Engine]: The answer explicitly contradicts core engineering principles, rejecting required architecture, testing, or security standards.',
+      weakTopics: ['Software Architecture Principles', 'Engineering Best Practices'],
+      detectedQuestionIntent: intent.topicIntent,
+      expectedConcepts: intent.expectedConcepts,
+      explainedConcepts: [],
+      merelyMentionedConcepts: [],
+      missingConcepts: intent.expectedConcepts,
+      unrelatedConcepts: [],
+      answerDepth: 'Contradictory / Anti-Pattern',
+      contradictionDetected: true,
+      buzzwordDumpDetected: false,
+      metaTestTextDetected: false
     };
   }
 
-  // 4. Typo-ridden but Meaningful Answer Handling
-  const relevantTechConcepts = ['memoization', 'rerenders', 'lazy', 'bundle', 'profiling', 'clinic', 'chrome', 'devtools', 'jest', 'supertest', 'boundary', 'boundaries', 'async', 'await', 'zod', 'prisma', 'express', 'controller', 'hooks', 'state', 'props', 'component', 'cache', 'indexing', 'query'];
-  
-  let relevantConceptMatches = 0;
-  relevantTechConcepts.forEach(c => {
-    if (textLower.includes(c) || textLower.includes(c.slice(0, 5))) relevantConceptMatches++;
+  // 4. Question Concept Explanation vs Mere Mention Classifier
+  const explainedConcepts = [];
+  const merelyMentionedConcepts = [];
+  const missingConcepts = [];
+  const unrelatedConcepts = [];
+
+  // Match explained concepts
+  intent.explanationKeywords.forEach(k => {
+    if (textLower.includes(k.toLowerCase())) {
+      if (!explainedConcepts.includes(k)) explainedConcepts.push(k);
+    }
   });
 
-  if (words.length <= 16 || relevantConceptMatches <= 1) {
-    return {
-      isMeaningless: false,
-      score: 4,
-      technicalAccuracy: 4,
-      communication: 5,
-      relevance: 4,
-      feedback: `Identifies high-level concepts for ${technology}, but lacks detailed architectural patterns, implementation depth, or trade-offs.`,
-      weakTopics: ['Implementation Detail', 'Performance Trade-offs']
-    };
+  // Match passive mentions
+  intent.passiveMentions.forEach(p => {
+    if (textLower.includes(p.toLowerCase()) && !explainedConcepts.some(ec => ec.toLowerCase().includes(p.toLowerCase()))) {
+      if (!merelyMentionedConcepts.includes(p)) merelyMentionedConcepts.push(p);
+    }
+  });
+
+  // Identify missing expected concepts
+  intent.expectedConcepts.forEach(ec => {
+    const ecLower = ec.toLowerCase();
+    if (!explainedConcepts.some(k => ecLower.includes(k.toLowerCase()))) {
+      missingConcepts.push(ec);
+    }
+  });
+
+  // Check for unrelated infrastructure/tech list terms (e.g. MongoDB, Redis, Docker, Kubernetes, JWT, PostgreSQL)
+  const infrastructureTerms = ['mongodb', 'redis', 'kubernetes', 'docker', 'jwt', 'postgresql', 'prisma', 'api gateway', 'git'];
+  infrastructureTerms.forEach(term => {
+    if (textLower.includes(term)) {
+      if (!intent.explanationKeywords.some(k => k.toLowerCase().includes(term))) {
+        unrelatedConcepts.push(term);
+      }
+    }
+  });
+
+  const buzzwordDumpDetected = unrelatedConcepts.length >= 3 && explainedConcepts.length <= 1;
+
+  // 5. Answer Depth & Calibration
+  let answerDepth = 'Shallow';
+  let score = 3;
+  let relevance = 3;
+  let technicalAccuracy = 3;
+  let communication = 4;
+  let feedback = '';
+
+  if (buzzwordDumpDetected || (unrelatedConcepts.length >= 1 && explainedConcepts.length === 0)) {
+    answerDepth = buzzwordDumpDetected ? 'Unrelated Technical Buzzword Dump' : 'Unrelated Technical Answer';
+    score = 2;
+    relevance = 1;
+    technicalAccuracy = 1;
+    communication = 2;
+    feedback = buzzwordDumpDetected
+      ? '[Evaluation Engine]: Answer lists unrelated infrastructure and technology names without explaining the requested question concepts.'
+      : '[Evaluation Engine]: Answer mentions technical concepts that fail to address the requested question intent.';
+  } else if (explainedConcepts.length === 0 && merelyMentionedConcepts.length === 0) {
+    answerDepth = 'Unrelated Natural Language';
+    score = 1;
+    relevance = 1;
+    technicalAccuracy = 1;
+    communication = 1;
+    feedback = '[Evaluation Engine]: Answer is completely unrelated to the technical question asked.';
+  } else if (explainedConcepts.length === 0 && merelyMentionedConcepts.length > 0) {
+    answerDepth = 'Relevant Shallow (Mere Mentions)';
+    score = 3;
+    relevance = 3;
+    technicalAccuracy = 3;
+    communication = 4;
+    feedback = '[Evaluation Engine]: Mentions high-level technology names but fails to explain or demonstrate the requested mechanisms.';
+  } else if (explainedConcepts.length === 1 && intent.expectedConcepts.length >= 3) {
+    // Answer addresses only 1 single sub-concept of a multi-dimensional question (Incomplete Partial Answer)
+    answerDepth = 'Incomplete Partial Answer';
+    score = 4;
+    relevance = 4;
+    technicalAccuracy = 4;
+    communication = 5;
+    feedback = '[Evaluation Engine]: Correctly addresses a subset of the question, but omits key required technical dimensions.';
+  } else if (explainedConcepts.length >= 1 && explainedConcepts.length <= 2) {
+    answerDepth = 'Relevant & Adequately Explained';
+    score = 6;
+    relevance = 6;
+    technicalAccuracy = 6;
+    communication = 6;
+    feedback = `[Evaluation Engine]: Demonstrated adequate technical explanation for ${technology}.`;
+  } else {
+    // 3+ explained concepts or detailed question-focused explanation
+    answerDepth = 'Detailed & Question-Focused';
+    relevance = Math.min(10, Math.max(8, 7 + Math.min(3, explainedConcepts.length)));
+    technicalAccuracy = Math.min(10, Math.max(8, 7 + Math.min(3, explainedConcepts.length)));
+    communication = Math.min(10, 8 + Math.min(2, Math.floor(words.length / 30)));
+    score = Math.round(relevance * 0.45 + technicalAccuracy * 0.40 + communication * 0.15);
+    feedback = `[Evaluation Engine]: Demonstrated strong, detailed technical mastery for ${technology}.`;
   }
 
-  const calculatedScore = Math.min(10, Math.max(8, 7 + Math.min(3, relevantConceptMatches - 1)));
   return {
-    isMeaningless: false,
-    score: calculatedScore,
-    technicalAccuracy: calculatedScore,
-    communication: Math.min(10, calculatedScore),
-    relevance: Math.min(10, calculatedScore),
-    feedback: `Excellent technical response demonstrating deep understanding of ${technology} architecture and performance considerations.`,
-    weakTopics: ['Edge Case Micro-optimizations']
+    isMeaningless: score <= 2,
+    score,
+    technicalAccuracy,
+    communication,
+    relevance,
+    feedback,
+    weakTopics: missingConcepts.length > 0 ? missingConcepts : ['Edge Case Optimization'],
+    detectedQuestionIntent: intent.topicIntent,
+    expectedConcepts: intent.expectedConcepts,
+    explainedConcepts,
+    merelyMentionedConcepts,
+    missingConcepts,
+    unrelatedConcepts,
+    answerDepth,
+    contradictionDetected: false,
+    buzzwordDumpDetected,
+    metaTestTextDetected: false
   };
 }
 
@@ -365,6 +696,9 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
   let geminiRawResponse = '';
   let fallbackUsed = false;
   let fallbackReason = '';
+  let qualityDiagnostics = null;
+
+  const intent = extractQuestionIntent(currentQuestion.question);
 
   const gemini = getGeminiClient();
   if (gemini) {
@@ -390,10 +724,18 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
       const parsed = JSON.parse(cleaned);
 
       // Clamp sub-scores strictly to 0-10 without artificial floor
-      const score = Math.min(10, Math.max(0, Math.round(parsed.score ?? 0)));
-      const technicalAccuracy = Math.min(10, Math.max(0, Math.round(parsed.technicalAccuracy ?? score)));
-      const communication = Math.min(10, Math.max(0, Math.round(parsed.communication ?? score)));
-      const relevance = Math.min(10, Math.max(0, Math.round(parsed.relevance ?? score)));
+      const relevance = Math.min(10, Math.max(0, Math.round(parsed.relevance ?? 0)));
+      const technicalAccuracy = Math.min(10, Math.max(0, Math.round(parsed.technicalAccuracy ?? 0)));
+      const communication = Math.min(10, Math.max(0, Math.round(parsed.communication ?? 0)));
+
+      let score = parsed.score !== undefined && parsed.score !== null
+        ? Math.min(10, Math.max(0, Math.round(parsed.score)))
+        : Math.round(relevance * 0.45 + technicalAccuracy * 0.40 + communication * 0.15);
+
+      // Apply hard failure caps if contradiction, buzzword dump, or meta text was detected
+      if (parsed.contradictionDetected || parsed.buzzwordDumpDetected || parsed.metaTestTextDetected) {
+        score = Math.min(2, score);
+      }
 
       let followUpQuestion = parsed.followUpQuestion;
       const existingQTexts = questions.map(q => q.question);
@@ -412,6 +754,18 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
         followUpQuestion
       };
       geminiSuccess = true;
+      qualityDiagnostics = {
+        detectedQuestionIntent: parsed.detectedQuestionIntent || intent.topicIntent,
+        expectedConcepts: parsed.expectedConcepts || intent.expectedConcepts,
+        explainedConcepts: parsed.explainedConcepts || [],
+        merelyMentionedConcepts: parsed.merelyMentionedConcepts || [],
+        missingConcepts: parsed.missingConcepts || intent.expectedConcepts,
+        unrelatedConcepts: parsed.unrelatedConcepts || [],
+        answerDepth: parsed.answerDepth || (relevance >= 8 ? 'Detailed' : 'Adequately Explained'),
+        contradictionDetected: Boolean(parsed.contradictionDetected),
+        buzzwordDumpDetected: Boolean(parsed.buzzwordDumpDetected),
+        metaTestTextDetected: Boolean(parsed.metaTestTextDetected)
+      };
     } catch (err) {
       fallbackUsed = true;
       fallbackReason = `Gemini API call failed: ${err.message}`;
@@ -425,6 +779,7 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
   if (!evaluationResult) {
     // Dynamic text quality and question relevance evaluation fallback
     const quality = analyzeAnswerTextQuality(answerText, session.technology, currentQuestion.question);
+    qualityDiagnostics = quality;
     const existingQTexts = questions.map(q => q.question);
     const followUpQuestion = generateFallbackAdaptiveQuestion(session, existingQTexts, questions.length + 1, quality.weakTopics);
 
@@ -433,24 +788,34 @@ async function evaluateAnswerWithAI(session, questions, currentQuestion, answerT
       technicalAccuracy: quality.technicalAccuracy,
       communication: quality.communication,
       relevance: quality.relevance,
-      feedback: `[Evaluation Engine]: ${quality.feedback}`,
+      feedback: `${quality.feedback}`,
       weakTopics: quality.weakTopics,
       followUpQuestion
     };
   }
 
-  // Diagnostic Logger (Does not print API keys)
+  // Structured Diagnostic Logger (Does not log API keys, secrets, or passwords)
   const llmProvider = geminiSuccess ? `Google Gemini (${process.env.GEMINI_MODEL || 'gemini-2.5-flash'})` : 'Local Intelligent Evaluation Engine';
   console.log(`\n🔍 [AI Evaluation Diagnostics]`);
-  console.log(`   - Question Asked: "${currentQuestion.question}"`);
-  console.log(`   - Answer Received: "${answerText}"`);
-  console.log(`   - LLM Provider Used: ${llmProvider}`);
-  console.log(`   - Gemini Request Succeeded: ${geminiSuccess ? 'YES' : 'NO'}`);
-  console.log(`   - Fallback Reason: ${fallbackReason || 'N/A'}`);
-  console.log(`   - Relevance Score: ${evaluationResult.relevance}/10`);
-  console.log(`   - Technical Score: ${evaluationResult.technicalAccuracy}/10`);
-  console.log(`   - Communication Score: ${evaluationResult.communication}/10`);
-  console.log(`   - Final Persisted Score: ${evaluationResult.score}/10`);
+  console.log(JSON.stringify({
+    question: currentQuestion.question,
+    answer: answerText,
+    provider: llmProvider,
+    detectedQuestionIntent: qualityDiagnostics?.detectedQuestionIntent || intent.topicIntent,
+    expectedConcepts: qualityDiagnostics?.expectedConcepts || intent.expectedConcepts,
+    explainedConcepts: qualityDiagnostics?.explainedConcepts || [],
+    merelyMentionedConcepts: qualityDiagnostics?.merelyMentionedConcepts || [],
+    missingConcepts: qualityDiagnostics?.missingConcepts || [],
+    unrelatedConcepts: qualityDiagnostics?.unrelatedConcepts || [],
+    contradictionDetected: qualityDiagnostics?.contradictionDetected || false,
+    buzzwordDumpDetected: qualityDiagnostics?.buzzwordDumpDetected || false,
+    metaTestTextDetected: qualityDiagnostics?.metaTestTextDetected || false,
+    answerDepth: qualityDiagnostics?.answerDepth || 'Evaluated',
+    semanticRelevance: evaluationResult.relevance,
+    technicalAccuracy: evaluationResult.technicalAccuracy,
+    communication: evaluationResult.communication,
+    finalScore: evaluationResult.score
+  }, null, 2));
 
   return evaluationResult;
 }
